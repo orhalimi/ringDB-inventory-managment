@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "LOTR Inventory Manager",
+  "description": "Track your physical LOTR LCG collection and detect card conflicts across active decks.",
+  "version": "0.1",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": ["https://ringsdb.com/*"],
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "LOTR Inventory Manager"
+  },
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://ringsdb.com/*"],
+      "js": ["src/content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["lib/dexie.mjs"],
+      "matches": ["https://ringsdb.com/*"]
+    }
+  ]
+}

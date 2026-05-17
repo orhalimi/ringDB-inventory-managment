@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LOTR Inventory Manager</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <h1>LOTR Inventory</h1>
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="packs">Packs</button>
+      <button class="tab-btn" data-tab="decks">Decks</button>
+      <button class="tab-btn" data-tab="cards">Cards</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="tab-packs" class="tab-content active"></section>
+    <section id="tab-decks" class="tab-content"></section>
+    <section id="tab-cards" class="tab-content"></section>
+  </main>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
