@@ -1,18 +1,12 @@
-import { getCards, searchCards, getCardByCode } from '../../dbService.js';
+import { getCards, searchCards } from '../../dbService.js';
 
 export async function renderCardsTab(container) {
-  container.innerHTML = '';
-  showListView(container);
-}
-
-async function showListView(container, initialQuery = '') {
   container.innerHTML = '';
 
   const search = document.createElement('input');
   search.type = 'text';
   search.className = 'search-input';
   search.placeholder = 'Search by card name…';
-  search.value = initialQuery;
   container.appendChild(search);
 
   const list = document.createElement('div');
@@ -34,7 +28,7 @@ async function showListView(container, initialQuery = '') {
     }
 
     for (const card of cards) {
-      list.appendChild(buildCardRow(card, container));
+      list.appendChild(buildCardRow(card));
     }
   };
 
@@ -43,11 +37,13 @@ async function showListView(container, initialQuery = '') {
     debounceTimer = setTimeout(() => renderList(search.value.trim()), 200);
   });
 
-  await renderList(initialQuery);
+  await renderList('');
   search.focus();
 }
 
-function buildCardRow(card, container) {
+function buildCardRow(card) {
+  const wrapper = document.createElement('div');
+
   const row = document.createElement('div');
   row.className = 'list-item';
   row.style.cursor = 'pointer';
@@ -66,25 +62,23 @@ function buildCardRow(card, container) {
   pack.textContent = card.pack_code;
 
   row.append(name, sphere, pack);
-  row.addEventListener('click', () => showDetailView(container, card));
-  return row;
+
+  const detail = buildDetail(card);
+  detail.style.display = 'none';
+
+  row.addEventListener('click', () => {
+    const open = detail.style.display !== 'none';
+    detail.style.display = open ? 'none' : 'block';
+  });
+
+  wrapper.append(row, detail);
+  return wrapper;
 }
 
-async function showDetailView(container, card) {
-  container.innerHTML = '';
-
-  const backBtn = document.createElement('button');
-  backBtn.className = 'back-btn';
-  backBtn.textContent = '← Back to list';
-  backBtn.addEventListener('click', () => showListView(container));
-  container.appendChild(backBtn);
-
+function buildDetail(card) {
   const detail = document.createElement('div');
   detail.className = 'card-detail';
-
-  const title = document.createElement('h2');
-  title.textContent = card.name;
-  detail.appendChild(title);
+  detail.style.cssText = 'margin: 0 0 4px 0; border-top: none; border-radius: 0 0 4px 4px;';
 
   const fields = [
     ['Type', card.type_name ?? card.type_code],
@@ -132,7 +126,7 @@ async function showDetailView(container, card) {
     detail.appendChild(textRow);
   }
 
-  container.appendChild(detail);
+  return detail;
 }
 
 function formatSphere(code) {
