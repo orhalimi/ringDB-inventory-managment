@@ -5,6 +5,7 @@ import {
   updateCustomCopy,
   deleteCustomCopy,
 } from "../../dbService.js";
+import { notifyInventoryChanged } from './constants.js';
 
 export async function renderSinglesTab(container) {
   container.innerHTML = "";
@@ -81,7 +82,7 @@ async function handleAdd(input, errorMsg, listWrapper) {
   const added = codes.length - failed.length;
   if (added > 0) {
     input.value = "";
-    notifySinglesUpdated();
+    notifyInventoryChanged();
     await renderList(listWrapper);
   }
 }
@@ -143,7 +144,7 @@ function buildRow(copy, card, wrapper) {
     val = Math.min(99, val);
     qtyInput.value = val;
     await updateCustomCopy(copy.code, val);
-    notifySinglesUpdated();
+    notifyInventoryChanged();
   });
 
   qtyPair.append(lbl, qtyInput);
@@ -156,7 +157,7 @@ function buildRow(copy, card, wrapper) {
 
   delBtn.addEventListener("click", async () => {
     await deleteCustomCopy(copy.code);
-    notifySinglesUpdated();
+    notifyInventoryChanged();
     await renderList(wrapper);
   });
 
@@ -164,6 +165,3 @@ function buildRow(copy, card, wrapper) {
   return row;
 }
 
-function notifySinglesUpdated() {
-  chrome.storage.local.set({ lotrPacksUpdatedAt: Date.now() });
-}

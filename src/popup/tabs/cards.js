@@ -1,4 +1,48 @@
 import { getCards, searchCards, getOwnedPacks, getCustomCopies } from '../../dbService.js';
+import { sphereColor, formatSphere } from './spheres.js';
+import { STORAGE_KEYS } from './constants.js';
+
+const FIELD_MAP = {
+  k: 'traits', s: 'sphere_code', t: 'type_code',
+  w: 'willpower', o: 'cost', a: 'attack', d: 'defense',
+  h: 'health', b: 'threat', u: 'is_unique', x: 'text', e: 'pack_code',
+};
+
+function parseQuery(raw) {
+  const tokens = [];
+  const nameParts = [];
+  for (const part of raw.trim().split(/\s+/)) {
+    if (!part) continue;
+    const m = part.match(/^([a-z])([:<>])(.+)$/i);
+    if (m) tokens.push({ field: m[1].toLowerCase(), op: m[2], value: m[3] });
+    else nameParts.push(part);
+  }
+  return { tokens, nameQuery: nameParts.join(' ') };
+}
+
+function applyFilters(cards, tokens) {
+  return cards.filter(card =>
+    tokens.every(({ field, op, value }) => {
+      const key = FIELD_MAP[field];
+      if (!key) return true;
+      const cardVal = card[key];
+      if (cardVal == null) return false;
+      if (key === 'is_unique') {
+        return Boolean(cardVal) === ['1', 'true', 'yes'].includes(value.toLowerCase());
+      }
+      if (typeof cardVal === 'number') {
+        const num = parseFloat(value);
+        if (isNaN(num)) return false;
+        if (op === '>') return cardVal > num;
+        if (op === '<') return cardVal < num;
+        return cardVal === num;
+      }
+      const str = String(cardVal).toLowerCase();
+      const val = value.toLowerCase();
+      return op === '=' ? str === val : str.includes(val);
+    })
+  );
+}
 
 async function buildOwnedMap() {
   const [packs, copies] = await Promise.all([getOwnedPacks(), getCustomCopies()]);
@@ -16,11 +60,58 @@ function totalOwned(card, packMap, customMap) {
 export async function renderCardsTab(container) {
   container.innerHTML = '';
 
+  const stored = await new Promise(resolve =>
+    chrome.storage.local.get([STORAGE_KEYS.CARD_FILTER, STORAGE_KEYS.OWNED_ONLY], resolve)
+  );
+  const savedQuery = stored[STORAGE_KEYS.CARD_FILTER] ?? '';
+  const savedOwnedOnly = stored[STORAGE_KEYS.OWNED_ONLY] ?? false;
+
+  const searchRow = document.createElement('div');
+  searchRow.style.cssText = 'display:flex;align-items:center;gap:6px;flex-shrink:0;';
+
   const search = document.createElement('input');
   search.type = 'text';
   search.className = 'search-input';
-  search.placeholder = 'Search by card name…';
-  container.appendChild(search);
+  search.placeholder = 'Search or filter cards (supports RingsDB filters)';
+  search.style.flex = '1';
+  if (savedQuery) search.value = savedQuery;
+
+  const helpWrap = document.createElement('div');
+  helpWrap.className = 'filter-help-wrap';
+
+  const helpBtn = document.createElement('div');
+  helpBtn.className = 'filter-help-btn';
+  helpBtn.textContent = '?';
+
+  const tooltip = document.createElement('div');
+  tooltip.className = 'filter-tooltip';
+  tooltip.textContent = [
+    'k: Traits       s: Sphere',
+    'w: Willpower    o: Cost',
+    'a: Attack       d: Defense',
+    'h: Hit Points   b: Threat',
+    't: Type code    u: Unique (1/0)',
+    'x: Card text    e: Pack code',
+    'Operators: > < : (contains)',
+    'Example: k:silvan w>2',
+  ].join('\n');
+
+  helpWrap.append(helpBtn, tooltip);
+  searchRow.append(search, helpWrap);
+  container.appendChild(searchRow);
+
+  const filterRow = document.createElement('label');
+  filterRow.className = 'owned-filter-row';
+
+  const ownedCheck = document.createElement('input');
+  ownedCheck.type = 'checkbox';
+  ownedCheck.checked = savedOwnedOnly;
+
+  const ownedLabel = document.createElement('span');
+  ownedLabel.textContent = 'Show owned only';
+
+  filterRow.append(ownedCheck, ownedLabel);
+  container.appendChild(filterRow);
 
   const list = document.createElement('div');
   list.style.cssText = 'display:flex;flex-direction:column;gap:4px;flex:1;min-height:0;overflow-y:auto;';
@@ -28,17 +119,20 @@ export async function renderCardsTab(container) {
 
   let debounceTimer;
 
-  const renderList = async (query) => {
+  const renderList = async (query, ownedOnly) => {
     list.innerHTML = '';
-    const [cards, { packMap, customMap }] = await Promise.all([
-      query ? searchCards(query) : getCards(),
+    const { tokens, nameQuery } = parseQuery(query);
+    const [rawCards, { packMap, customMap }] = await Promise.all([
+      nameQuery ? searchCards(nameQuery) : getCards(),
       buildOwnedMap(),
     ]);
+    let cards = tokens.length > 0 ? applyFilters(rawCards, tokens) : rawCards;
+    if (ownedOnly) cards = cards.filter(c => totalOwned(c, packMap, customMap) > 0);
 
     if (cards.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'empty-state';
-      empty.textContent = query ? 'No cards match your search.' : 'Card database is loading…';
+      empty.textContent = (query || ownedOnly) ? 'No cards match your search.' : 'Card database is loading…';
       list.appendChild(empty);
       return;
     }
@@ -49,11 +143,19 @@ export async function renderCardsTab(container) {
   };
 
   search.addEventListener('input', () => {
+    const q = search.value.trim();
+    chrome.storage.local.set({ [STORAGE_KEYS.CARD_FILTER]: q });
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => renderList(search.value.trim()), 200);
+    debounceTimer = setTimeout(() => renderList(q, ownedCheck.checked), 200);
   });
 
-  await renderList('');
+  ownedCheck.addEventListener('change', () => {
+    chrome.storage.local.set({ [STORAGE_KEYS.OWNED_ONLY]: ownedCheck.checked });
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => renderList(search.value.trim(), ownedCheck.checked), 200);
+  });
+
+  await renderList(savedQuery, savedOwnedOnly);
   search.focus();
 }
 
@@ -154,20 +256,4 @@ export function buildDetail(card) {
   return detail;
 }
 
-export function formatSphere(code) {
-  const map = { leadership: 'L', tactics: 'T', spirit: 'S', lore: 'Lo', neutral: 'N' };
-  return map[code] ?? code ?? '';
-}
-
-export function sphereColor(code) {
-  const map = {
-    leadership: '#b07fd4',
-    tactics:    '#e07070',
-    spirit:     '#70a0e0',
-    lore:       '#70bb70',
-    neutral:    '#a09888',
-    baggins:    '#e8c86a',
-    fellowship: '#c8a060',
-  };
-  return map[code] ?? '#e8e0d0';
-}
+export { sphereColor, formatSphere };

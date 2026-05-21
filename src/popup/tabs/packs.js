@@ -1,4 +1,5 @@
 import { getAllPacks, getOwnedPacks, upsertPack } from '../../dbService.js';
+import { notifyInventoryChanged } from './constants.js';
 
 export async function renderPacksTab(container) {
   container.innerHTML = '';
@@ -77,7 +78,7 @@ async function doImport() {
       added++;
     }
 
-    if (added > 0) notifyPacksUpdated();
+    if (added > 0) notifyInventoryChanged();
     return { added, error: null };
   } catch {
     return { added: 0, error: 'Could not reach ringsdb.com. Make sure you are logged in.' };
@@ -102,10 +103,6 @@ function parseActivePacks(html) {
   }
 
   return map;
-}
-
-function notifyPacksUpdated() {
-  chrome.storage.local.set({ lotrPacksUpdatedAt: Date.now() });
 }
 
 async function renderOwnedList(container) {
@@ -155,13 +152,13 @@ function buildPackRow(pack, container) {
     const newOwned = val;
     const newActive = Math.min(pack.active_count, newOwned);
     await upsertPack({ ...pack, owned_count: newOwned, active_count: newActive });
-    notifyPacksUpdated();
+    notifyInventoryChanged();
     await renderOwnedList(container);
   });
 
   const activePair = buildQtyPair('Active', pack.active_count, 0, pack.owned_count, async (val) => {
     await upsertPack({ ...pack, active_count: val });
-    notifyPacksUpdated();
+    notifyInventoryChanged();
     await renderOwnedList(container);
   });
 
@@ -242,7 +239,7 @@ async function openAddPackModal(container) {
       item.appendChild(name);
       item.addEventListener('click', async () => {
         await upsertPack({ ...pack, owned_count: 1, active_count: 1 });
-        notifyPacksUpdated();
+        notifyInventoryChanged();
         overlay.remove();
         await renderOwnedList(container);
       });

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LOTR Inventory Manager",
   "description": "Track your physical LOTR LCG collection and detect card conflicts across active decks.",
-  "version": "0.1",
+  "version": "0.2",
   "permissions": ["storage"],
   "host_permissions": ["https://ringsdb.com/*"],
   "action": {

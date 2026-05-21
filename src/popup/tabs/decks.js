@@ -1,5 +1,6 @@
 import { upsertDecks, getActiveDecks, toggleDeckInactive, getOwnedPacks, getCustomCopies, getCardsByCodes } from '../../dbService.js';
-import { buildDetail, formatSphere, sphereColor } from './cards.js';
+import { buildDetail } from './cards.js';
+import { formatSphere, sphereColor } from './spheres.js';
 
 const DECKS_API = 'https://ringsdb.com/api/oauth2/decks';
 
