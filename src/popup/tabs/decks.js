@@ -1,9 +1,11 @@
-import { upsertDecks, getActiveDecks, toggleDeckInactive } from '../../dbService.js';
+import { upsertDecks, getActiveDecks, toggleDeckInactive, getOwnedPacks, getCustomCopies, getCardsByCodes } from '../../dbService.js';
+import { buildDetail, formatSphere } from './cards.js';
 
 const DECKS_API = 'https://ringsdb.com/api/oauth2/decks';
 
 export async function renderDecksTab(container) {
   container.innerHTML = '';
+  document.body.style.width = '';
 
   const topBar = document.createElement('div');
   topBar.style.cssText = 'display:flex;align-items:center;gap:8px;flex-shrink:0;';
@@ -55,6 +57,8 @@ export async function renderDecksTab(container) {
 
 async function renderDeckList(wrapper) {
   wrapper.innerHTML = '';
+  document.body.style.width = '';
+
   const decks = await getActiveDecks();
 
   if (decks.length === 0) {
@@ -70,9 +74,13 @@ async function renderDeckList(wrapper) {
   }
 }
 
-function buildDeckRow(deck, wrapper) {
+function buildDeckRow(deck, listWrapper) {
+  const rowWrapper = document.createElement('div');
+  rowWrapper.style.cssText = 'display:flex;flex-direction:column;flex-shrink:0;';
+
   const row = document.createElement('div');
   row.className = 'list-item';
+  row.style.cursor = 'pointer';
 
   const toggle = document.createElement('label');
   toggle.className = 'toggle';
@@ -87,7 +95,8 @@ function buildDeckRow(deck, wrapper) {
 
   toggle.append(checkbox, slider);
 
-  checkbox.addEventListener('change', async () => {
+  checkbox.addEventListener('change', async (e) => {
+    e.stopPropagation();
     await toggleDeckInactive(deck.deck_id, !checkbox.checked);
   });
 
@@ -113,8 +122,154 @@ function buildDeckRow(deck, wrapper) {
     inactiveLabel.style.display = checkbox.checked ? 'none' : 'inline';
   });
 
-  row.append(toggle, info, inactiveLabel);
-  return row;
+  const chevron = document.createElement('span');
+  chevron.className = 'deck-chevron';
+  chevron.textContent = '▶';
+
+  row.append(toggle, info, inactiveLabel, chevron);
+
+  const expandEl = document.createElement('div');
+  expandEl.className = 'deck-expand';
+  expandEl.style.display = 'none';
+
+  row.addEventListener('click', async (e) => {
+    if (e.target.closest('label.toggle')) return;
+
+    const isOpen = expandEl.style.display !== 'none';
+
+    // Close all
+    listWrapper.querySelectorAll('.deck-expand').forEach(el => { el.style.display = 'none'; });
+    listWrapper.querySelectorAll('.deck-chevron').forEach(el => { el.style.transform = ''; });
+    document.body.style.width = '';
+
+    if (!isOpen) {
+      expandEl.style.display = 'block';
+      chevron.style.transform = 'rotate(90deg)';
+      document.body.style.width = '480px';
+      await renderDeckExpand(deck, expandEl);
+    }
+  });
+
+  rowWrapper.append(row, expandEl);
+  return rowWrapper;
+}
+
+async function renderDeckExpand(deck, container) {
+  container.innerHTML = '<p style="font-size:11px;color:#8a7a60;padding:6px 4px;">Loading…</p>';
+
+  const codes = Object.keys(deck.all_cards);
+  const [cards, packs, allDecks, customCopies] = await Promise.all([
+    getCardsByCodes(codes),
+    getOwnedPacks(),
+    getActiveDecks(),
+    getCustomCopies(),
+  ]);
+
+  const cardMap = Object.fromEntries(cards.map(c => [c.code, c]));
+  const packMap = Object.fromEntries(packs.map(p => [p.pack_code, p.active_count]));
+  const customMap = Object.fromEntries(customCopies.map(c => [c.code, c.owned_count]));
+
+  const inUseByOthers = {};
+  for (const d of allDecks) {
+    if (d.deck_id === deck.deck_id || d.is_inactive) continue;
+    for (const [code, qty] of Object.entries(d.all_cards)) {
+      inUseByOthers[code] = (inUseByOthers[code] || 0) + qty;
+    }
+  }
+
+  const entries = Object.entries(deck.all_cards).map(([code, qty]) => {
+    const card = cardMap[code];
+    const fromPack = card ? (packMap[card.pack_code] ?? 0) * card.quantity : 0;
+    const fromSingles = customMap[code] ?? 0;
+    const available = fromPack + fromSingles - (inUseByOthers[code] ?? 0);
+    return { code, qty, card, conflict: qty > available };
+  });
+
+  const grouped = {
+    hero:       entries.filter(e => e.card?.type_code === 'hero'),
+    ally:       entries.filter(e => e.card?.type_code === 'ally'),
+    attachment: entries.filter(e => e.card?.type_code === 'attachment'),
+    event:      entries.filter(e => e.card?.type_code === 'event'),
+    extra:      entries.filter(e => !['hero', 'ally', 'attachment', 'event'].includes(e.card?.type_code)),
+  };
+
+  container.innerHTML = '';
+  container.style.cssText = 'display:flex;gap:8px;padding:8px 4px 4px;';
+
+  const leftCol = document.createElement('div');
+  leftCol.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;';
+
+  const rightCol = document.createElement('div');
+  rightCol.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;';
+
+  appendGroup(leftCol, 'Heroes', grouped.hero);
+  appendGroup(leftCol, 'Allies', grouped.ally);
+  appendGroup(rightCol, 'Attachments', grouped.attachment);
+  appendGroup(rightCol, 'Events', grouped.event);
+  if (grouped.extra.length > 0) appendGroup(rightCol, 'Extra', grouped.extra);
+
+  container.append(leftCol, rightCol);
+}
+
+function appendGroup(col, title, entries) {
+  if (entries.length === 0) return;
+
+  const total = entries.reduce((s, e) => s + e.qty, 0);
+
+  const label = document.createElement('div');
+  label.className = 'section-label';
+  label.textContent = `${title} (${total})`;
+  col.appendChild(label);
+
+  for (const entry of entries) {
+    col.appendChild(buildCardEntry(entry));
+  }
+}
+
+function buildCardEntry({ code, qty, card, conflict }) {
+  const wrapper = document.createElement('div');
+
+  const row = document.createElement('div');
+  row.className = 'deck-card-row';
+
+  if (conflict) {
+    const warn = document.createElement('span');
+    warn.className = 'deck-card-warn';
+    warn.textContent = '(!)';
+    row.appendChild(warn);
+  }
+
+  const qtySpan = document.createElement('span');
+  qtySpan.className = 'deck-card-qty';
+  qtySpan.textContent = `${qty}×`;
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'deck-card-name';
+  nameSpan.textContent = card ? card.name : code;
+
+  row.append(qtySpan, nameSpan);
+
+  if (card?.sphere_code) {
+    const sphereSpan = document.createElement('span');
+    sphereSpan.className = 'deck-card-sphere';
+    sphereSpan.textContent = `[${formatSphere(card.sphere_code)}]`;
+    row.appendChild(sphereSpan);
+  }
+
+  if (card) {
+    const detail = buildDetail(card);
+    detail.style.display = 'none';
+    detail.style.marginTop = '2px';
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', () => {
+      detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+    });
+    wrapper.append(row, detail);
+  } else {
+    wrapper.appendChild(row);
+  }
+
+  return wrapper;
 }
 
 function transformDeck(raw) {

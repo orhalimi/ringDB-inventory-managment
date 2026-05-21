@@ -273,6 +273,51 @@ main { flex: 1; overflow: hidden; }
 
 .qty-pair .qty-input { width: 38px; }
 
+/* Deck expand */
+.deck-chevron {
+  font-size: 10px;
+  color: #6a5a40;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.deck-card-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: default;
+}
+
+.deck-card-row:hover { background: #2a1f0e; }
+
+.deck-card-warn {
+  color: #c0392b;
+  font-weight: 700;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.deck-card-qty {
+  color: #6a5a40;
+  flex-shrink: 0;
+}
+
+.deck-card-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deck-card-sphere {
+  color: #6a5a40;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
 .tab-subtitle {
   font-size: 11px;
   color: #6a5a40;

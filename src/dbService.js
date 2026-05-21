@@ -34,6 +34,11 @@ export async function getCardByCode(code) {
   return db.cards.get(code);
 }
 
+export async function getCardsByCodes(codes) {
+  const results = await db.cards.bulkGet(codes);
+  return results.filter(Boolean);
+}
+
 // --- Packs ---
 
 export async function seedPacks(packs) {

@@ -98,7 +98,7 @@ function buildCardRow(card, owned) {
   return wrapper;
 }
 
-function buildDetail(card) {
+export function buildDetail(card) {
   const detail = document.createElement('div');
   detail.className = 'card-detail';
   detail.style.cssText = 'margin: 0 0 4px 0; border-top: none; border-radius: 0 0 4px 4px;';
@@ -152,7 +152,7 @@ function buildDetail(card) {
   return detail;
 }
 
-function formatSphere(code) {
+export function formatSphere(code) {
   const map = { leadership: 'L', tactics: 'T', spirit: 'S', lore: 'Lo', neutral: 'N' };
   return map[code] ?? code ?? '';
 }

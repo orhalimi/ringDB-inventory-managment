@@ -13,6 +13,7 @@ const TABS = {
 let activeTab = 'packs';
 
 async function switchTab(name) {
+  document.body.style.width = '';
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === name);
   });
