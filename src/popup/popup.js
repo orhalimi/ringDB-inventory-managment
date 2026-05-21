@@ -1,11 +1,13 @@
 import { renderPacksTab } from './tabs/packs.js';
 import { renderDecksTab } from './tabs/decks.js';
 import { renderCardsTab } from './tabs/cards.js';
+import { renderSinglesTab } from './tabs/singles.js';
 
 const TABS = {
   packs: { el: document.getElementById('tab-packs'), render: renderPacksTab },
   decks: { el: document.getElementById('tab-decks'), render: renderDecksTab },
   cards: { el: document.getElementById('tab-cards'), render: renderCardsTab },
+  singles: { el: document.getElementById('tab-singles'), render: renderSinglesTab },
 };
 
 let activeTab = 'packs';

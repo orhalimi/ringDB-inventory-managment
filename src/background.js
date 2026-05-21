@@ -1,4 +1,4 @@
-import { seedCards, seedPacks, getCards, getAllPacks, getActiveDecks } from './dbService.js';
+import { seedCards, seedPacks, getCards, getAllPacks, getActiveDecks, getCustomCopies } from './dbService.js';
 
 const CARDS_API = 'https://ringsdb.com/api/public/cards/';
 const PACKS_API = 'https://ringsdb.com/api/public/packs/';
@@ -43,18 +43,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 async function computeAvailability(currentDeckId) {
-  const [cards, packs, decks] = await Promise.all([
+  const [cards, packs, decks, customCopies] = await Promise.all([
     getCards(),
     getAllPacks(),
     getActiveDecks(),
+    getCustomCopies(),
   ]);
 
   const packMap = new Map(packs.map(p => [p.pack_code, p.active_count]));
+  const customMap = new Map(customCopies.map(c => [c.code, c.owned_count]));
 
   const totalOwned = new Map();
   for (const card of cards) {
     const activeCount = packMap.get(card.pack_code) ?? 0;
-    totalOwned.set(card.code, card.quantity * activeCount);
+    const fromSingles = customMap.get(card.code) ?? 0;
+    totalOwned.set(card.code, card.quantity * activeCount + fromSingles);
   }
 
   const inUse = new Map();

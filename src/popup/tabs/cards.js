@@ -1,4 +1,17 @@
-import { getCards, searchCards } from '../../dbService.js';
+import { getCards, searchCards, getOwnedPacks, getCustomCopies } from '../../dbService.js';
+
+async function buildOwnedMap() {
+  const [packs, copies] = await Promise.all([getOwnedPacks(), getCustomCopies()]);
+  const packMap = Object.fromEntries(packs.map(p => [p.pack_code, p.active_count]));
+  const customMap = Object.fromEntries(copies.map(c => [c.code, c.owned_count]));
+  return { packMap, customMap };
+}
+
+function totalOwned(card, packMap, customMap) {
+  const fromPack = (packMap[card.pack_code] ?? 0) * (card.quantity ?? 1);
+  const fromSingles = customMap[card.code] ?? 0;
+  return fromPack + fromSingles;
+}
 
 export async function renderCardsTab(container) {
   container.innerHTML = '';
@@ -17,7 +30,10 @@ export async function renderCardsTab(container) {
 
   const renderList = async (query) => {
     list.innerHTML = '';
-    const cards = query ? await searchCards(query) : await getCards();
+    const [cards, { packMap, customMap }] = await Promise.all([
+      query ? searchCards(query) : getCards(),
+      buildOwnedMap(),
+    ]);
 
     if (cards.length === 0) {
       const empty = document.createElement('p');
@@ -28,7 +44,7 @@ export async function renderCardsTab(container) {
     }
 
     for (const card of cards) {
-      list.appendChild(buildCardRow(card));
+      list.appendChild(buildCardRow(card, totalOwned(card, packMap, customMap)));
     }
   };
 
@@ -41,7 +57,7 @@ export async function renderCardsTab(container) {
   search.focus();
 }
 
-function buildCardRow(card) {
+function buildCardRow(card, owned) {
   const wrapper = document.createElement('div');
 
   const row = document.createElement('div');
@@ -51,6 +67,13 @@ function buildCardRow(card) {
   const name = document.createElement('span');
   name.className = 'list-item-name';
   name.textContent = card.name;
+
+  if (owned > 0) {
+    const count = document.createElement('span');
+    count.className = 'owned-count';
+    count.textContent = `(${owned})`;
+    name.appendChild(count);
+  }
 
   const sphere = document.createElement('span');
   sphere.className = 'list-item-meta';

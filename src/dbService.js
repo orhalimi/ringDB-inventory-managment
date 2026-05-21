@@ -8,6 +8,13 @@ db.version(1).stores({
   activeDecks: 'deck_id',
 });
 
+db.version(2).stores({
+  cards: 'code, pack_code, name, type_code, sphere_code',
+  packs: 'pack_code, cycle_position',
+  activeDecks: 'deck_id',
+  customCopies: 'code',
+});
+
 // --- Cards ---
 
 export async function seedCards(cards) {
@@ -64,6 +71,28 @@ export async function getActiveDecks() {
 
 export async function toggleDeckInactive(deckId, isInactive) {
   return db.activeDecks.update(deckId, { is_inactive: isInactive });
+}
+
+// --- Custom Copies (singles) ---
+
+export async function getCustomCopies() {
+  return db.customCopies.toArray();
+}
+
+export async function addCustomCopy(code) {
+  const existing = await db.customCopies.get(code);
+  if (existing) {
+    return db.customCopies.update(code, { owned_count: existing.owned_count + 1 });
+  }
+  return db.customCopies.add({ code, owned_count: 1 });
+}
+
+export async function updateCustomCopy(code, owned_count) {
+  return db.customCopies.update(code, { owned_count });
+}
+
+export async function deleteCustomCopy(code) {
+  return db.customCopies.delete(code);
 }
 
 export default db;
