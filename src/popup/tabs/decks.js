@@ -1,5 +1,5 @@
 import { upsertDecks, getActiveDecks, toggleDeckInactive, getOwnedPacks, getCustomCopies, getCardsByCodes } from '../../dbService.js';
-import { buildDetail, formatSphere } from './cards.js';
+import { buildDetail, formatSphere, sphereColor } from './cards.js';
 
 const DECKS_API = 'https://ringsdb.com/api/oauth2/decks';
 
@@ -246,6 +246,8 @@ function buildCardEntry({ code, qty, card, conflict }) {
   const nameSpan = document.createElement('span');
   nameSpan.className = 'deck-card-name';
   nameSpan.textContent = card ? card.name : code;
+  if (card?.sphere_code) nameSpan.style.color = sphereColor(card.sphere_code);
+  if (card?.is_unique) nameSpan.style.fontWeight = 'bold';
 
   row.append(qtySpan, nameSpan);
 

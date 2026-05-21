@@ -67,6 +67,8 @@ function buildCardRow(card, owned) {
   const name = document.createElement('span');
   name.className = 'list-item-name';
   name.textContent = card.name;
+  name.style.color = sphereColor(card.sphere_code);
+  if (card.is_unique) name.style.fontWeight = 'bold';
 
   if (owned > 0) {
     const count = document.createElement('span');
@@ -155,4 +157,17 @@ export function buildDetail(card) {
 export function formatSphere(code) {
   const map = { leadership: 'L', tactics: 'T', spirit: 'S', lore: 'Lo', neutral: 'N' };
   return map[code] ?? code ?? '';
+}
+
+export function sphereColor(code) {
+  const map = {
+    leadership: '#b07fd4',
+    tactics:    '#e07070',
+    spirit:     '#70a0e0',
+    lore:       '#70bb70',
+    neutral:    '#a09888',
+    baggins:    '#e8c86a',
+    fellowship: '#c8a060',
+  };
+  return map[code] ?? '#e8e0d0';
 }
