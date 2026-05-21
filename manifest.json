@@ -5,9 +5,19 @@
   "version": "0.2",
   "permissions": ["storage"],
   "host_permissions": ["https://ringsdb.com/*"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
     "default_popup": "src/popup/popup.html",
-    "default_title": "LOTR Inventory Manager"
+    "default_title": "LOTR Inventory Manager",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "background": {
     "service_worker": "src/background.js",

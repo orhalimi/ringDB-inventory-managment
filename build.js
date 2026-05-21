@@ -22,5 +22,6 @@ fs.rmSync(OUT, { recursive: true, force: true });
 copy('manifest.json', `${OUT}/manifest.json`);
 copyDir('src', `${OUT}/src`);
 copyDir('lib', `${OUT}/lib`);
+copyDir('icons', `${OUT}/icons`);
 
 console.log('Built to /build — ready to zip.');
