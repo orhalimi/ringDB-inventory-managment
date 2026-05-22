@@ -1,14 +1,16 @@
 (function () {
-  const editMatch = location.pathname.match(/^\/deck\/edit\/(\d+)/);
-  const viewMatch = location.pathname.match(/^\/deck\/view\/(\d+)/);
+  const editMatch       = location.pathname.match(/^\/deck\/edit\/(\d+)/);
+  const viewMatch       = location.pathname.match(/^\/deck\/view\/(\d+)/);
+  const decklistMatch   = location.pathname.match(/^\/decklist\/view\/(\d+)/);
+  const fellowshipMatch = location.pathname.match(/^\/fellowship\/view\/(\d+)/);
 
-  if (!editMatch && !viewMatch) return;
+  if (!editMatch && !viewMatch && !decklistMatch && !fellowshipMatch) return;
 
-  const deckId = parseInt((editMatch || viewMatch)[1]);
-  const isEdit = !!editMatch;
+  const deckId      = (editMatch || viewMatch) ? parseInt((editMatch || viewMatch)[1]) : null;
+  const isEdit      = !!editMatch;
+  const isFellowship = !!fellowshipMatch;
   const MARKER  = 'lotr-inv-warn';
   const WARN_ID = 'lotr-inv-save-warn';
-  const WIDGET_ID = 'lotr-inv-widget';
 
   // --- Styles ---
   const style = document.createElement('style');
@@ -41,51 +43,6 @@
     }
     .${MARKER}:hover::after { opacity: 1; }
 
-    #${WIDGET_ID} {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 6px 0;
-      margin-bottom: 12px;
-      font-size: 13px;
-      font-family: inherit;
-      color: #555;
-      border-bottom: 1px solid #e5e5e5;
-      user-select: none;
-    }
-    #${WIDGET_ID} .lotr-label { font-weight: bold; letter-spacing: 0.03em; }
-    #${WIDGET_ID} .lotr-toggle {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-    }
-    #${WIDGET_ID} .lotr-toggle input { display: none; }
-    #${WIDGET_ID} .lotr-pill {
-      width: 32px;
-      height: 16px;
-      background: #555;
-      border-radius: 8px;
-      position: relative;
-      transition: background 0.2s;
-      flex-shrink: 0;
-    }
-    #${WIDGET_ID} .lotr-pill::after {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 12px;
-      height: 12px;
-      background: #fff;
-      border-radius: 50%;
-      transition: left 0.2s;
-    }
-    #${WIDGET_ID} input:checked ~ .lotr-pill { background: #27ae60; }
-    #${WIDGET_ID} input:checked ~ .lotr-pill::after { left: 18px; }
-    #${WIDGET_ID} .lotr-status { font-size: 11px; color: #888; min-width: 48px; }
-    #${WIDGET_ID} input:checked ~ .lotr-status { color: #2ecc71; }
-
     #${WARN_ID} {
       color: #c0392b;
       font-size: 13px;
@@ -95,33 +52,12 @@
   `;
   document.head.appendChild(style);
 
-  // --- Widget ---
   let isActive = true;
-
-  const widget = document.createElement('div');
-  widget.id = WIDGET_ID;
-  widget.innerHTML = `
-    <span class="lotr-label">LOTR Inventory</span>
-    <label class="lotr-toggle">
-      <input type="checkbox" checked>
-      <span class="lotr-pill"></span>
-      <span class="lotr-status">Active</span>
-    </label>
-  `;
-  const deckContentEl = document.getElementById('deck-content');
-  if (deckContentEl) {
-    deckContentEl.parentNode.insertBefore(widget, deckContentEl);
-  } else {
-    document.body.appendChild(widget);
-  }
-
-  const toggleInput = widget.querySelector('input[type="checkbox"]');
-  const statusLabel = widget.querySelector('.lotr-status');
+  let availability = null;
+  let debounceTimer = null;
 
   function applyActiveState(active) {
     isActive = active;
-    toggleInput.checked = active;
-    statusLabel.textContent = active ? 'Active' : 'Inactive';
     if (!active) {
       document.querySelectorAll('.' + MARKER).forEach(el => el.remove());
       removeSaveWarning();
@@ -130,12 +66,6 @@
     }
   }
 
-  // Persist toggle to shared storage so any part of the extension can read/write it
-  toggleInput.addEventListener('change', () => {
-    chrome.storage.local.set({ lotrInventoryActive: toggleInput.checked });
-  });
-
-  // React to changes from anywhere in the extension
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     if ('lotrInventoryActive' in changes) {
@@ -150,10 +80,36 @@
     }
   });
 
-  // --- Annotation ---
-  let availability = null;
-  let debounceTimer = null;
+  // --- Element finding ---
+  function getDeckContents() {
+    if (isFellowship) {
+      return [...document.querySelectorAll('.deck-content')]
+        .filter(el => !el.closest('[id$="-side-content"]'));
+    }
+    const el = document.getElementById('deck-content') || document.querySelector('.deck-content');
+    return el ? [el] : [];
+  }
 
+  // --- Observer setup ---
+  function setupContentObservers(contents) {
+    for (const deckContent of contents) {
+      new MutationObserver(scheduleAnnotation).observe(deckContent, {
+        childList: true,
+        subtree: true,
+      });
+    }
+    if (isEdit) {
+      const collectionTable = document.getElementById('collection-table');
+      if (collectionTable) {
+        new MutationObserver(scheduleAnnotation).observe(collectionTable, {
+          childList: true,
+          subtree: true,
+        });
+      }
+    }
+  }
+
+  // --- Annotation ---
   function scheduleAnnotation(mutations) {
     if (mutations) {
       const allOurs = mutations.every(m =>
@@ -174,25 +130,24 @@
   }
 
   function annotateDeckContent() {
-    const deckContent = document.getElementById('deck-content');
-    if (!deckContent) return;
+    for (const deckContent of getDeckContents()) {
+      deckContent.querySelectorAll('.' + MARKER).forEach(el => el.remove());
 
-    deckContent.querySelectorAll('.' + MARKER).forEach(el => el.remove());
+      for (const link of deckContent.querySelectorAll('a.card[data-code]')) {
+        const code = link.getAttribute('data-code');
+        const free = availability[code] ?? 0;
+        const countSpan = link.parentElement?.querySelector('span.card-count');
+        const qty = countSpan ? (parseInt(countSpan.textContent) || 1) : 1;
 
-    for (const link of deckContent.querySelectorAll('a.card[data-code]')) {
-      const code = link.getAttribute('data-code');
-      const free = availability[code] ?? 0;
-      const countSpan = link.parentElement?.querySelector('span.card-count');
-      const qty = countSpan ? (parseInt(countSpan.textContent) || 1) : 1;
-
-      if (qty > free) {
-        link.after(makeMarker('Not enough copies in your active packs'));
+        if (qty > free) {
+          link.after(makeMarker('Not enough copies in your active packs'));
+        }
       }
-    }
 
-    if (isEdit) {
-      const hasConflicts = deckContent.querySelectorAll('.' + MARKER).length > 0;
-      hasConflicts ? showSaveWarning() : removeSaveWarning();
+      if (isEdit) {
+        const hasConflicts = deckContent.querySelectorAll('.' + MARKER).length > 0;
+        hasConflicts ? showSaveWarning() : removeSaveWarning();
+      }
     }
   }
 
@@ -241,31 +196,27 @@
 
   // --- Init ---
   chrome.storage.local.get('lotrInventoryActive', (result) => {
-    // Default true if never set
-    const stored = result.lotrInventoryActive;
-    if (stored === false) applyActiveState(false);
+    if (result.lotrInventoryActive === false) isActive = false;
 
     chrome.runtime.sendMessage({ type: 'getCardAvailability', deckId }, (resp) => {
       if (chrome.runtime.lastError) return;
       availability = resp;
+
+      const foundContents = getDeckContents();
       annotate();
+      setupContentObservers(foundContents);
 
-      const deckContent = document.getElementById('deck-content');
-      if (deckContent) {
-        new MutationObserver(scheduleAnnotation).observe(deckContent, {
-          childList: true,
-          subtree: true,
+      // Fallback for pages that inject deck content after document_end
+      if (foundContents.length === 0) {
+        const bodyObserver = new MutationObserver(() => {
+          const found = getDeckContents();
+          if (found.length > 0) {
+            bodyObserver.disconnect();
+            annotate();
+            setupContentObservers(found);
+          }
         });
-      }
-
-      if (isEdit) {
-        const collectionTable = document.getElementById('collection-table');
-        if (collectionTable) {
-          new MutationObserver(scheduleAnnotation).observe(collectionTable, {
-            childList: true,
-            subtree: true,
-          });
-        }
+        bodyObserver.observe(document.body, { childList: true, subtree: true });
       }
     });
   });

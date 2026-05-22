@@ -18,12 +18,29 @@ header {
   padding: 10px 12px 0;
 }
 
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
 h1 {
   font-size: 14px;
   font-weight: 700;
   color: #c9a84c;
   letter-spacing: 0.05em;
-  margin-bottom: 8px;
+}
+
+.header-active {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header-active-label {
+  font-size: 11px;
+  color: #8a7a60;
 }
 
 /* Tabs */

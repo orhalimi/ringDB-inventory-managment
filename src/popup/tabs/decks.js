@@ -1,6 +1,7 @@
 import { upsertDecks, getActiveDecks, toggleDeckInactive, getOwnedPacks, getCustomCopies, getCardsByCodes } from '../../dbService.js';
 import { buildDetail } from './cards.js';
 import { formatSphere, sphereColor } from './spheres.js';
+import { notifyInventoryChanged } from './constants.js';
 
 const DECKS_API = 'https://ringsdb.com/api/oauth2/decks';
 
@@ -99,6 +100,7 @@ function buildDeckRow(deck, listWrapper) {
   checkbox.addEventListener('change', async (e) => {
     e.stopPropagation();
     await toggleDeckInactive(deck.deck_id, !checkbox.checked);
+    notifyInventoryChanged();
   });
 
   const info = document.createElement('div');
