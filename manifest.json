@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "LOTR Inventory Manager",
-  "description": "Track your physical LOTR LCG collection and detect card conflicts across active decks.",
-  "version": "0.3",
+  "description": "Track your physical LOTR LCG collection and detect card conflicts across active decks. sideboard is not sync",
+  "version": "0.4",
   "permissions": ["storage"],
   "host_permissions": ["https://ringsdb.com/*"],
   "icons": {
