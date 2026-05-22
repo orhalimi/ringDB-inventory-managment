@@ -202,19 +202,14 @@ All endpoints are on `https://ringsdb.com`. Authenticated endpoints require the 
 | `id` | Primary key (`deck_id`) |
 | `name` | Display in Decks tab |
 | `heroes` | Merged into unified card map for conflict calculation |
-| `slots` | Main deck cards — merged with heroes + sideslots |
-| `sideslots` | Side deck cards — included in "in use" pool (may be `[]` or `{}`) |
+| `slots` | Main deck cards — merged with heroes |
+| `sideslots` | **Ignored** — sideboard cards are not stored or counted as "in use" |
 | `date_update` | Show last sync time in UI |
 
 ### Storage transformation
-When storing a deck, merge `heroes`, `slots`, and `sideslots` into one unified map:
+When storing a deck, merge only `heroes` and `slots` into one unified map. `sideslots` is intentionally excluded:
 ```js
 const allCards = { ...deck.heroes, ...deck.slots };
-if (!Array.isArray(deck.sideslots)) {
-  for (const [code, qty] of Object.entries(deck.sideslots)) {
-    allCards[code] = (allCards[code] || 0) + qty;
-  }
-}
 ```
 
 ---
@@ -223,4 +218,4 @@ if (!Array.isArray(deck.sideslots)) {
 
 - All public endpoints (`/api/public/`) work without auth and can be called from the background service worker.
 - The decks endpoint (`/api/oauth2/decks`) requires an active RingsDB session. If the user is not logged in, the request will return a redirect or 401. The extension must handle this gracefully (show "Please log in to RingsDB" in the popup).
-- `sideslots` can be either `[]` (empty array) or `{}` (object with card_code keys) — handle both shapes.
+- `sideslots` can be either `[]` (empty array) or `{}` (object with card_code keys) — but the extension ignores sideslots entirely; they are not stored or factored into conflict detection.

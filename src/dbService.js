@@ -78,6 +78,10 @@ export async function toggleDeckInactive(deckId, isInactive) {
   return db.activeDecks.update(deckId, { is_inactive: isInactive });
 }
 
+export async function deleteDeck(deckId) {
+  return db.activeDecks.delete(deckId);
+}
+
 // --- Custom Copies (singles) ---
 
 export async function getCustomCopies() {

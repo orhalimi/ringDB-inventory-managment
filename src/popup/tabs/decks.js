@@ -1,4 +1,4 @@
-import { upsertDecks, getActiveDecks, toggleDeckInactive, getOwnedPacks, getCustomCopies, getCardsByCodes } from '../../dbService.js';
+import { upsertDecks, getActiveDecks, toggleDeckInactive, deleteDeck, getOwnedPacks, getCustomCopies, getCardsByCodes } from '../../dbService.js';
 import { buildDetail } from './cards.js';
 import { formatSphere, sphereColor } from './spheres.js';
 import { notifyInventoryChanged } from './constants.js';
@@ -129,7 +129,20 @@ function buildDeckRow(deck, listWrapper) {
   chevron.className = 'deck-chevron';
   chevron.textContent = '▶';
 
-  row.append(toggle, info, inactiveLabel, chevron);
+  const deleteBtn = document.createElement('button');
+  deleteBtn.textContent = 'Delete';
+  deleteBtn.style.cssText = 'background:none;border:none;color:#c05050;cursor:pointer;font-size:11px;padding:0 4px;line-height:1;flex-shrink:0;opacity:0.6;';
+  deleteBtn.addEventListener('mouseenter', () => { deleteBtn.style.opacity = '1'; });
+  deleteBtn.addEventListener('mouseleave', () => { deleteBtn.style.opacity = '0.6'; });
+
+  deleteBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    await deleteDeck(deck.deck_id);
+    notifyInventoryChanged();
+    await renderDeckList(listWrapper);
+  });
+
+  row.append(toggle, info, inactiveLabel, deleteBtn, chevron);
 
   const expandEl = document.createElement('div');
   expandEl.className = 'deck-expand';
@@ -279,13 +292,6 @@ function buildCardEntry({ code, qty, card, conflict }) {
 
 function transformDeck(raw) {
   const all_cards = { ...raw.heroes, ...raw.slots };
-
-  const sideslots = raw.sideslots;
-  if (sideslots && !Array.isArray(sideslots)) {
-    for (const [code, qty] of Object.entries(sideslots)) {
-      all_cards[code] = (all_cards[code] || 0) + qty;
-    }
-  }
 
   return {
     deck_id: raw.id,

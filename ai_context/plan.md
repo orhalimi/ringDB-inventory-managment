@@ -18,8 +18,8 @@ A Chrome Extension that tracks a user's physical LOTR LCG card collection and sh
 | Reprint handling | Each reprint is a distinct `card_code`; no grouping |
 | Inventory formula | `Total Owned(X) = card.quantity × pack.active_count + customCopies[X].owned_count` |
 | Active decks | All decks active by default; user toggles individual decks **inactive** in Decks tab |
-| Deck card pool | `heroes + slots + sideslots` merged into one unified `{card_code: qty}` map per deck |
-| sideslots shape | Can be `[]` or `{}`; handle both. Include in "in use" pool |
+| Deck card pool | `heroes + slots` merged into one unified `{card_code: qty}` map per deck |
+| sideslots (sideboard) | Ignored during sync — sideboard cards are not counted as "in use" and do not affect conflict detection |
 | Conflict engine | `src/inventoryEngine.js` — pure shared module used by background and content script |
 | Content script | Active on RingsDB deck builder pages; annotates cards with `(!)` conflict markers |
 | Deck sync | Manual: "Sync Decks" button in Decks tab; user must be logged in to RingsDB |
@@ -75,7 +75,7 @@ Only packs with `owned_count > 0` are shown in the Packs tab.
 |---|---|
 | `deck_id` | Primary key (RingsDB `id`) |
 | `name` | Display name |
-| `all_cards` | Merged `{card_code: qty}` from heroes + slots + sideslots |
+| `all_cards` | Merged `{card_code: qty}` from heroes + slots only (sideslots excluded) |
 | `date_update` | ISO timestamp; shown as "Updated …" |
 | `is_inactive` | Default `false`; set locally, never synced to RingsDB |
 
@@ -135,8 +135,11 @@ lotr_extention/
 
 #### Decks Tab
 - "Sync Decks" → `GET /api/oauth2/decks`; shows error banner on failure
+- Sync **overrides** existing local deck data (name, cards, date_update) while preserving `is_inactive`
+- Sync does **not** auto-delete local decks that were removed on RingsDB — user must delete them manually
 - Lists all synced decks with toggle to mark as inactive
-- Click a deck row (not the toggle) to expand it:
+- Each deck row has a **"Delete" button** — removes the deck from local storage and notifies the inventory engine
+- Click a deck row (not the toggle or delete button) to expand it:
   - Fetches cards/packs/decks/customCopies fresh every time (no caching)
   - Two-column layout: left = Heroes + Allies, right = Attachments + Events + Extra
   - Each card shows: `(!) qty× Name [sphere]` — `(!)` appears if conflict
@@ -193,6 +196,10 @@ See `api_calls.md` for full request/response documentation.
 
 - **`seedCards` uses `bulkPut`** — overwrites entire card records on re-seed. Never store user data (like custom counts) on the Cards table.
 - **`customCopies` is immune to re-seeding** because it is a separate table.
+- **`upsertDecks` preserves `is_inactive`** — on sync, all other deck fields are overwritten but the local active/inactive toggle state is retained.
+- **`deleteDeck(deckId)`** — removes a single deck from `activeDecks` by primary key. Called from the Delete button in the deck row; always followed by `notifyInventoryChanged()`.
+- **Sideboard excluded** — `sideslots` from the RingsDB API are intentionally ignored; `all_cards` contains only `heroes + slots`.
+- **Sync does not prune** — decks removed on RingsDB persist locally until the user manually deletes them via the Delete button.
 - **Width lifecycle**: `document.body.style.width` is set to `480px` on deck expand and reset to `''` on collapse, sync, and every tab switch. Never gets stuck wide.
 - **Conflict notification**: `chrome.storage.local.set({ lotrPacksUpdatedAt: Date.now() })` is the signal that triggers the content script to re-fetch the availability map from the background.
 - **`sphereColor` and `formatSphere`** are exported from `cards.js` and imported in `decks.js` — single source of truth for sphere display logic.
