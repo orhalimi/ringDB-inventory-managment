@@ -1,4 +1,4 @@
-import { getCards, searchCards, getOwnedPacks, getCustomCopies } from '../../dbService.js';
+import { getCards, searchCards, getOwnedPacks, getCustomCopies, getActiveDecks } from '../../dbService.js';
 import { sphereColor, formatSphere } from './spheres.js';
 import { STORAGE_KEYS } from './constants.js';
 
@@ -193,9 +193,10 @@ function buildCardRow(card, owned) {
   const detail = buildDetail(card);
   detail.style.display = 'none';
 
-  row.addEventListener('click', () => {
+  row.addEventListener('click', async () => {
     const open = detail.style.display !== 'none';
     detail.style.display = open ? 'none' : 'block';
+    if (!open) await populateUsedBy(detail, card.code);
   });
 
   wrapper.append(row, detail);
@@ -254,6 +255,31 @@ export function buildDetail(card) {
   }
 
   return detail;
+}
+
+export async function populateUsedBy(detail, cardCode) {
+  let row = detail.querySelector('.used-by-row');
+  if (!row) {
+    row = document.createElement('div');
+    row.className = 'used-by-row field';
+    row.style.marginTop = '6px';
+    detail.appendChild(row);
+  }
+
+  const decks = await getActiveDecks();
+  const using = decks
+    .filter(d => !d.is_inactive && d.all_cards?.[cardCode])
+    .map(d => `${d.name} (×${d.all_cards[cardCode]})`);
+
+  row.innerHTML = '';
+  const lbl = document.createElement('span');
+  lbl.className = 'field-label';
+  lbl.textContent = 'Used by';
+
+  const val = document.createElement('span');
+  val.textContent = using.length > 0 ? using.join(', ') : 'None';
+
+  row.append(lbl, val);
 }
 
 export { sphereColor, formatSphere };

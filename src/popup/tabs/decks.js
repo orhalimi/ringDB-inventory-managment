@@ -1,5 +1,5 @@
 import { upsertDecks, getActiveDecks, toggleDeckInactive, deleteDeck, getOwnedPacks, getCustomCopies, getCardsByCodes } from '../../dbService.js';
-import { buildDetail } from './cards.js';
+import { buildDetail, populateUsedBy } from './cards.js';
 import { formatSphere, sphereColor } from './spheres.js';
 import { notifyInventoryChanged } from './constants.js';
 
@@ -279,8 +279,10 @@ function buildCardEntry({ code, qty, card, conflict }) {
     detail.style.display = 'none';
     detail.style.marginTop = '2px';
     row.style.cursor = 'pointer';
-    row.addEventListener('click', () => {
-      detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+    row.addEventListener('click', async () => {
+      const opening = detail.style.display === 'none';
+      detail.style.display = opening ? 'block' : 'none';
+      if (opening) await populateUsedBy(detail, card.code);
     });
     wrapper.append(row, detail);
   } else {
