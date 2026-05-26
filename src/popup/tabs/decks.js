@@ -47,6 +47,7 @@ export async function renderDecksTab(container) {
       const rawDecks = await res.json();
       const decks = rawDecks.map(transformDeck);
       await upsertDecks(decks);
+      notifyInventoryChanged();
       await renderDeckList(listWrapper);
     } catch {
       banner.style.display = 'block';

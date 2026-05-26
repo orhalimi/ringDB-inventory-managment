@@ -258,6 +258,10 @@ export function buildDetail(card) {
 }
 
 export async function populateUsedBy(detail, cardCode) {
+  // Guard against concurrent calls (rapid double-click)
+  if (detail.dataset.usedByLoading) return;
+  detail.dataset.usedByLoading = '1';
+
   let row = detail.querySelector('.used-by-row');
   if (!row) {
     row = document.createElement('div');
@@ -267,6 +271,7 @@ export async function populateUsedBy(detail, cardCode) {
   }
 
   const decks = await getActiveDecks();
+  delete detail.dataset.usedByLoading;
   const using = decks
     .filter(d => !d.is_inactive && d.all_cards?.[cardCode])
     .map(d => `${d.name} (×${d.all_cards[cardCode]})`);

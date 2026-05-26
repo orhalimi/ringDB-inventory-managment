@@ -38,6 +38,13 @@ export async function renderSinglesTab(container) {
     "font-size:11px;color:#c0392b;min-height:16px;margin-top:2px;";
   container.appendChild(errorMsg);
 
+  const exportBtn = document.createElement("button");
+  exportBtn.className = "btn";
+  exportBtn.textContent = "Export singles (.txt)";
+  exportBtn.style.cssText = "align-self:flex-end;font-size:11px;padding:2px 8px;margin-top:2px;";
+  exportBtn.addEventListener("click", () => exportSingles());
+  container.appendChild(exportBtn);
+
   const listWrapper = document.createElement("div");
   listWrapper.style.cssText =
     "display:flex;flex-direction:column;gap:6px;flex:1;min-height:0;overflow-y:auto;margin-top:6px;";
@@ -163,5 +170,21 @@ function buildRow(copy, card, wrapper) {
 
   row.append(info, qtyPair, delBtn);
   return row;
+}
+
+async function exportSingles() {
+  const copies = await getCustomCopies();
+  if (copies.length === 0) return;
+
+  const codes = copies.flatMap(c => Array(c.owned_count).fill(c.code));
+  const content = codes.join(", ");
+
+  const blob = new Blob([content], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "lotr_singles.txt";
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
